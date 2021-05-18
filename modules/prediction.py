@@ -11,7 +11,7 @@ class Attention(nn.Module):
         self.attention_cell = AttentionCell(input_size, hidden_size, num_classes)
         self.hidden_size = hidden_size
         self.num_classes = num_classes
-        self.generator = nn.Linear(hidden_size, num_classes)
+        self.generator = nn.Linear(hidden_size, num_classes)  # compute probability from hidden layers (pd)
 
     def _char_to_onehot(self, input_char, onehot_dim=38):
         input_char = input_char.unsqueeze(1)
@@ -50,12 +50,12 @@ class Attention(nn.Module):
             for i in range(num_steps):
                 char_onehots = self._char_to_onehot(targets, onehot_dim=self.num_classes)
                 hidden, alpha = self.attention_cell(hidden, batch_H, char_onehots)
-                probs_step = self.generator(hidden[0])
-                probs[:, i, :] = probs_step
-                _, next_input = probs_step.max(1)
+                probs_step = self.generator(hidden[0])  # b, hidden size -> b, num classes
+                probs[:, i, :] = probs_step  # b, num_steps, num_classes
+                _, next_input = probs_step.max(1)  # b, 1 (optimal class for each batch)
                 targets = next_input
 
-        return probs  # batch_size x num_steps x num_classes
+        return probs  # batch_size x num_steps x num_classes [pd]
 
 
 class AttentionCell(nn.Module):
@@ -70,11 +70,11 @@ class AttentionCell(nn.Module):
 
     def forward(self, prev_hidden, batch_H, char_onehots):
         # [batch_size x num_encoder_step x num_channel] -> [batch_size x num_encoder_step x hidden_size]
-        batch_H_proj = self.i2h(batch_H)
-        prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)
-        e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1
+        batch_H_proj = self.i2h(batch_H)  # encoder hidden: change dimension
+        prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)  # previous hidden state[0]  batch_size, 1, hidden_size
+        e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size x num_encoder_step * 1 (aggregate information from encoder and previous hidden state)
 
-        alpha = F.softmax(e, dim=1)
+        alpha = F.softmax(e, dim=1)  # weight for each encoder step
         context = torch.bmm(alpha.permute(0, 2, 1), batch_H).squeeze(1)  # batch_size x num_channel
         concat_context = torch.cat([context, char_onehots], 1)  # batch_size x (num_channel + num_embedding)
         cur_hidden = self.rnn(concat_context, prev_hidden)

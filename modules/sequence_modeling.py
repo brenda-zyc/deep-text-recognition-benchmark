@@ -10,7 +10,7 @@ class BidirectionalLSTM(nn.Module):
 
     def forward(self, input):
         """
-        input : visual feature [batch_size x T x input_size]
+        input : visual feature [batch_size x T x input_size]  T: sequence length; input_size: number of features is 1
         output : contextual feature [batch_size x T x output_size]
         """
         self.rnn.flatten_parameters()

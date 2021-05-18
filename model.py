@@ -49,21 +49,21 @@ class Model(nn.Module):
         self.FeatureExtraction_output = opt.output_channel  # int(imgH/16-1) * 512
         self.AdaptiveAvgPool = nn.AdaptiveAvgPool2d((None, 1))  # Transform final (imgH/16-1) -> 1
 
-        """ Sequence modeling"""
+        """ Sequence modeling"""  # encoder
         if opt.SequenceModeling == 'BiLSTM':
             self.SequenceModeling = nn.Sequential(
-                BidirectionalLSTM(self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size),
+                BidirectionalLSTM(self.FeatureExtraction_output, opt.hidden_size, opt.hidden_size),  # input size, hidden size, output size
                 BidirectionalLSTM(opt.hidden_size, opt.hidden_size, opt.hidden_size))
             self.SequenceModeling_output = opt.hidden_size
         else:
             print('No SequenceModeling module specified')
             self.SequenceModeling_output = self.FeatureExtraction_output
 
-        """ Prediction """
+        """ Prediction """  # decoder
         if opt.Prediction == 'CTC':
             self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
         elif opt.Prediction == 'Attn':
-            self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class)
+            self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class)  # input size, hidden size, num classes
         else:
             raise Exception('Prediction is neither CTC or Attn')
 
@@ -73,19 +73,19 @@ class Model(nn.Module):
             input = self.Transformation(input)
 
         """ Feature extraction stage """
-        visual_feature = self.FeatureExtraction(input)
-        visual_feature = self.AdaptiveAvgPool(visual_feature.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h]
-        visual_feature = visual_feature.squeeze(3)
+        visual_feature = self.FeatureExtraction(input)  # input: an image
+        visual_feature = self.AdaptiveAvgPool(visual_feature.permute(0, 3, 1, 2))  # [b, c, h, w] -> [b, w, c, h] -> b, w, c, 1?
+        visual_feature = visual_feature.squeeze(3)  # b, w, c (b/c the organization of chars?)
 
         """ Sequence modeling stage """
         if self.stages['Seq'] == 'BiLSTM':
-            contextual_feature = self.SequenceModeling(visual_feature)
+            contextual_feature = self.SequenceModeling(visual_feature)  # b, w, c -> b, w, 2*hidden_size    w: sequence length, c: number of image channels
         else:
             contextual_feature = visual_feature  # for convenience. this is NOT contextually modeled by BiLSTM
 
         """ Prediction stage """
         if self.stages['Pred'] == 'CTC':
-            prediction = self.Prediction(contextual_feature.contiguous())
+            prediction = self.Prediction(contextual_feature.contiguous())  # contiguous(): 保证Tensor底层一维数组元素的存储顺序与Tensor按行优先一维展开的元素顺序一致
         else:
             prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
 
