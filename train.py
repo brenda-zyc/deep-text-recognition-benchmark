@@ -16,6 +16,8 @@ from utils import CTCLabelConverter, CTCLabelConverterForBaiduWarpctc, AttnLabel
 from dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
 from model import Model
 from test import validation
+from ep_loss import EPLoss
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -95,8 +97,11 @@ def train(opt):
             criterion = CTCLoss()
         else:
             criterion = torch.nn.CTCLoss(zero_infinity=True).to(device)
-    else:
+    elif 'Attn' in opt.Prediction:
         criterion = torch.nn.CrossEntropyLoss(ignore_index=0).to(device)  # ignore [GO] token = ignore index 0
+    else:  # todo: EP loss  (incomplete)
+        criterion = EPLoss().to(device)
+
     # loss averager
     loss_avg = Averager()
 
@@ -150,19 +155,26 @@ def train(opt):
         batch_size = image.size(0)
 
         if 'CTC' in opt.Prediction:
-            preds = model(image, text)
-            preds_size = torch.IntTensor([preds.size(1)] * batch_size)
+            preds = model(image, text)  # probability distribution for y      batch_size, num_steps, num_classes
+            preds_size = torch.IntTensor([preds.size(1)] * batch_size)  # num_steps * batch_size
             if opt.baiduCTC:
                 preds = preds.permute(1, 0, 2)  # to use CTCLoss format
                 cost = criterion(preds, text, preds_size, length) / batch_size
             else:
-                preds = preds.log_softmax(2).permute(1, 0, 2)
-                cost = criterion(preds, text, preds_size, length)
+                preds = preds.log_softmax(2).permute(1, 0, 2)  # compute softmax for classes  num_steps, batch_size, num_classes
+                cost = criterion(preds, text, preds_size, length)  # y, tgt, number of chars being predicted, length of target
 
-        else:
-            preds = model(image, text[:, :-1])  # align with Attention.forward
-            target = text[:, 1:]  # without [GO] Symbol
+        elif 'Attn' in opt.Prediction:  # for CE loss
+            preds, _, _ = model(image, text[:, :-1])  # align with Attention.forward
+            target = text[:, 1:]  # without [GO] Symbol  batch_size, max_length+1 (for EOS)
             cost = criterion(preds.view(-1, preds.shape[-1]), target.contiguous().view(-1))
+        else:  # todo: EP loss, need to implement
+            preds, R, I = model(image, text[:, :-1])  # align with Attention.forward
+            target = text[:, 1:]
+            cost = criterion(preds, R, I, target)
+
+            pass
+
 
         model.zero_grad()
         cost.backward()
@@ -172,7 +184,7 @@ def train(opt):
         loss_avg.add(cost)
 
         # validation part
-        if (iteration + 1) % opt.valInterval == 0 or iteration == 0: # To see training progress, we also conduct validation when 'iteration == 0' 
+        if (iteration + 1) % opt.valInterval == 0 or iteration == 0:  # To see training progress, we also conduct validation when 'iteration == 0'
             elapsed_time = time.time() - start_time
             # for log
             with open(f'./saved_models/{opt.exp_name}/log_train.txt', 'a') as log:
@@ -266,7 +278,7 @@ if __name__ == '__main__':
     parser.add_argument('--FeatureExtraction', type=str, required=True,
                         help='FeatureExtraction stage. VGG|RCNN|ResNet')
     parser.add_argument('--SequenceModeling', type=str, required=True, help='SequenceModeling stage. None|BiLSTM')
-    parser.add_argument('--Prediction', type=str, required=True, help='Prediction stage. CTC|Attn')
+    parser.add_argument('--Prediction', type=str, required=True, help='Prediction stage. CTC|Attn|EP')
     parser.add_argument('--num_fiducial', type=int, default=20, help='number of fiducial points of TPS-STN')
     parser.add_argument('--input_channel', type=int, default=1,
                         help='the number of input channel of Feature extractor')
