@@ -64,8 +64,10 @@ class Model(nn.Module):
             self.Prediction = nn.Linear(self.SequenceModeling_output, opt.num_class)
         elif opt.Prediction == 'Attn':
             self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class)  # input size, hidden size, num classes
+        elif opt.Prediction == "EP":
+            self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class)  # do we need to change the input
         else:
-            raise Exception('Prediction is neither CTC or Attn')
+            raise Exception('Prediction is neither CTC or Attn or EP')
 
     def forward(self, input, text, is_train=True):
         """ Transformation stage """
@@ -88,8 +90,7 @@ class Model(nn.Module):
             prediction = self.Prediction(contextual_feature.contiguous())  # contiguous(): 保证Tensor底层一维数组元素的存储顺序与Tensor按行优先一维展开的元素顺序一致
         # elif self.stages['Pred'] == 'EP':
         #     prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
-        else:
+        else:  # Attn & EP
             prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)  # should be a tuple in this case
-
-        # todo: output prediction, R and I
+            # todo: output prediction, R and I
         return prediction  # pd

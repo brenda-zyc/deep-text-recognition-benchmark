@@ -22,7 +22,7 @@ class Attention(nn.Module):
 
     def forward(self, batch_H, text, is_train=True, batch_max_length=25):
         """
-        input:
+        input: sequence modeling output
             batch_H : contextual_feature H = hidden state of encoder. [batch_size x num_steps x contextual_feature_channels]
             text : the text-index of each image. [batch_size x (max_length+1)]. +1 for [GO] token. text[:, 0] = [GO].
         output: probability distribution at each step [batch_size x num_steps x num_classes]
@@ -34,7 +34,7 @@ class Attention(nn.Module):
         hidden = (torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device),
                   torch.FloatTensor(batch_size, self.hidden_size).fill_(0).to(device))
 
-        R = torch.FloatTensor(batch_size, num_steps, 3).fill_(0).to(device)
+        R = torch.FloatTensor(batch_size, num_steps, 3).fill_(0).to(device)  # initialize with zeros
         I = torch.FloatTensor(batch_size, num_steps, self.num_classes).fill_(0).to(device)
 
         if is_train:
@@ -74,10 +74,9 @@ class AttentionCell(nn.Module):
         self.i2h = nn.Linear(input_size, hidden_size, bias=False)
         self.h2h = nn.Linear(hidden_size, hidden_size)  # either i2i or h2h should have bias
         self.score = nn.Linear(hidden_size, 1, bias=False)
-        self.rnn = nn.LSTMCell(input_size + num_embeddings, hidden_size)
+        self.rnn = nn.LSTMCell(input_size + num_embeddings, hidden_size)  # 256+25
         self.hidden_size = hidden_size
-
-        # todo: add softmax
+        # parameters for edit probability
         self.edit = nn.Linear(hidden_size, 3, bias=False)  # pd of edit operations
         self.insert = nn.Linear(hidden_size, num_embeddings, bias=False)  # pd of inserted characters
 
@@ -87,20 +86,13 @@ class AttentionCell(nn.Module):
         # char_onehots: batch_size, num_classes (number of alphabets?)  y_{t-1}
 
         # [batch_size x num_encoder_step x num_channel] -> [batch_size x num_encoder_step x hidden_size]
-        print("prev_hidden: {}, batch_H: {}, char_onehots: {}".format(prev_hidden[0].size(), batch_H.size(), char_onehots.size()))
         batch_H_proj = self.i2h(batch_H)  # batch_size, num_steps, hidden_size
         prev_hidden_proj = self.h2h(prev_hidden[0]).unsqueeze(1)  # batch_size, 1, hidden_size
-        print("batch_H_proj: {}, prev_hidden_proj: {}".format(batch_H_proj.size(), prev_hidden_proj.size()))
         e = self.score(torch.tanh(batch_H_proj + prev_hidden_proj))  # batch_size, num_encoder_step, 1 (aggregate information from encoder and previous hidden state)
-        print("e: {}".format(e.size()))
         alpha = F.softmax(e, dim=1)  # weight for each encoder step     batch_size, num_encoder_steps, 1
-        print("shape of alpha is {}".format(alpha.size()))
         context = torch.bmm(alpha.permute(0, 2, 1), batch_H).squeeze(1)  # batch_size x num_channel <- (batch_size, 1, num_channels)
-        print("after squeeze: {}".format(context.size()))
         concat_context = torch.cat([context, char_onehots], 1)  # batch_size x (num_channel + num_embedding)
-        print("size of concat_context: {}".format(concat_context.size()))
         cur_hidden = self.rnn(concat_context, prev_hidden)  # prev_hidden 为(h,c), concat_context为input, (batch_size, hidden_size)
-        print("current hidden: {}, {}".format(cur_hidden[0].size(), cur_hidden[1].size()))
         r = F.softmax(self.edit(cur_hidden[0]), dim=1)  # batch_size, 3
         i = F.softmax(self.insert(cur_hidden[0]), dim=1)  # batch_size, num_classes
         # todo: return r, i

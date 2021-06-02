@@ -11,6 +11,7 @@ import torch.nn.init as init
 import torch.optim as optim
 import torch.utils.data
 import numpy as np
+from torch.utils.tensorboard import SummaryWriter
 
 from utils import CTCLabelConverter, CTCLabelConverterForBaiduWarpctc, AttnLabelConverter, Averager
 from dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
@@ -18,8 +19,10 @@ from model import Model
 from test import validation
 from ep_loss import EPLoss
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+writer = SummaryWriter("runs/eploss")
+# todo: write to tensor board: training loss, prediction accuracy
 
 def train(opt):
     """ dataset preparation """
@@ -44,7 +47,7 @@ def train(opt):
     print('-' * 80)
     log.write('-' * 80 + '\n')
     log.close()
-    
+
     """ model configuration """
     if 'CTC' in opt.Prediction:
         if opt.baiduCTC:
@@ -79,6 +82,7 @@ def train(opt):
 
     # data parallel for multi-GPU
     model = torch.nn.DataParallel(model).to(device)
+
     model.train()
     if opt.saved_model != '':
         print(f'loading pretrained model from {opt.saved_model}')
@@ -93,7 +97,7 @@ def train(opt):
     if 'CTC' in opt.Prediction:
         if opt.baiduCTC:
             # need to install warpctc. see our guideline.
-            from warpctc_pytorch import CTCLoss 
+            from warpctc_pytorch import CTCLoss
             criterion = CTCLoss()
         else:
             criterion = torch.nn.CTCLoss(zero_infinity=True).to(device)
@@ -105,14 +109,15 @@ def train(opt):
     # loss averager
     loss_avg = Averager()
 
-    # filter that only require gradient decent
+    # filter that only require gradient decent i.e. requires_grad == True
     filtered_parameters = []
     params_num = []
     for p in filter(lambda p: p.requires_grad, model.parameters()):
         filtered_parameters.append(p)
         params_num.append(np.prod(p.size()))
     print('Trainable params num : ', sum(params_num))
-    # [print(name, p.numel()) for name, p in filter(lambda p: p[1].requires_grad, model.named_parameters())]
+    # print the name of trainable parameters todo: comment out
+    [print(name, p.numel()) for name, p in filter(lambda p: p[1].requires_grad, model.named_parameters())]
 
     # setup optimizer
     if opt.adam:
@@ -126,7 +131,7 @@ def train(opt):
     # print(opt)
     with open(f'./saved_models/{opt.exp_name}/opt.txt', 'a') as opt_file:
         opt_log = '------------ Options -------------\n'
-        args = vars(opt)
+        args = vars(opt)  # vars() 函数返回对象object的属性和属性值的字典对象
         for k, v in args.items():
             opt_log += f'{str(k)}: {str(v)}\n'
         opt_log += '---------------------------------------\n'
@@ -144,8 +149,10 @@ def train(opt):
 
     start_time = time.time()
     best_accuracy = -1
-    best_norm_ED = -1
+    best_norm_ED = -1  # todo: what is norm_ED?
     iteration = start_iter
+
+    # plot training loss
 
     while(True):
         # train part
@@ -171,13 +178,11 @@ def train(opt):
         else:  # todo: EP loss, need to implement
             preds, R, I = model(image, text[:, :-1])  # align with Attention.forward
             target = text[:, 1:]
-            cost = criterion(preds, R, I, target)
-
-            pass
-
+            cost = criterion(preds, R, I, target)  # [batch_size]
 
         model.zero_grad()
         cost.backward()
+        # todo: what is clip_grad_norm_
         torch.nn.utils.clip_grad_norm_(model.parameters(), opt.grad_clip)  # gradient clipping with 5 (Default)
         optimizer.step()
 

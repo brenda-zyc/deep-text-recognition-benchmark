@@ -118,7 +118,7 @@ def validation(model, criterion, evaluation_loader, converter, opt):
             preds_str = converter.decode(preds_index.data, preds_size.data)
         
         else:
-            preds = model(image, text_for_pred, is_train=False)
+            preds = model(image, text_for_pred, is_train=False)  # get pd
             forward_time = time.time() - start_time
 
             preds = preds[:, :text_for_loss.shape[1] - 1, :]
@@ -126,7 +126,7 @@ def validation(model, criterion, evaluation_loader, converter, opt):
             cost = criterion(preds.contiguous().view(-1, preds.shape[-1]), target.contiguous().view(-1))
 
             # select max probabilty (greedy decoding) then decode index to character
-            _, preds_index = preds.max(2)
+            _, preds_index = preds.max(2)  # greedy search, 找到每个step probability最大的class
             preds_str = converter.decode(preds_index, length_for_pred)
             labels = converter.decode(text_for_loss[:, 1:], length_for_loss)
 
@@ -218,6 +218,8 @@ def test(opt):
         criterion = torch.nn.CTCLoss(zero_infinity=True).to(device)
     else:
         criterion = torch.nn.CrossEntropyLoss(ignore_index=0).to(device)  # ignore [GO] token = ignore index 0
+
+    # todo: add EP loss
 
     """ evaluation """
     model.eval()

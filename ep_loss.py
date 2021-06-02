@@ -20,7 +20,7 @@ class EPLoss(nn.Module):
         p_I = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 1]
         p_D = torch.zeros(batch_size, n_T, n_y)      # compute from R[:, :, 2]
         p_C = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 0]
-        EOS = torch.tensor(1, dtype=torch.float)  # todo: float32 or 64?
+        EOS = torch.tensor(1, dtype=torch.float)  # float32
 
         # compute p_C, p_I, p_D
         for j in range(n_y):
@@ -54,6 +54,6 @@ class EPLoss(nn.Module):
                 prev_row[:, j - 1] = prev_col  # no longer need i-1, j-1, so update prev_row[j-1] to i, j-1
                 prev_col = curr_col  # update prev col (i, j-1) -> (i, j)
             prev_row[:, n_y - 1] = prev_col
-        loss = prev_row[:, n_y - 1]  # n_T-1, n_y-1 (loss for y, T)
+        loss = torch.log(prev_row[:, n_y - 1])  # n_T-1, n_y-1 (loss for y, T)
 
         return loss  # batch_size
