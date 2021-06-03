@@ -150,7 +150,7 @@ def train(opt):
 
     start_time = time.time()
     best_accuracy = -1
-    best_norm_ED = -1  # todo: what is norm_ED?
+    best_norm_ED = -1
     iteration = start_iter
 
     # plot training loss
@@ -177,7 +177,7 @@ def train(opt):
             preds, _, _ = model(image, text[:, :-1])  # align with Attention.forward
             target = text[:, 1:]  # without [GO] Symbol  batch_size, max_length+1 (for EOS)
             cost = criterion(preds.view(-1, preds.shape[-1]), target.contiguous().view(-1))
-        else:  # todo: EP loss, need to implement
+        else:
             preds, R, I = model(image, text[:, :-1])  # align with Attention.forward
             target = text[:, 1:]
             cost = criterion(preds, R, I, target)  # [batch_size]

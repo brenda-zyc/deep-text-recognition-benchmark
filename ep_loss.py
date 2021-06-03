@@ -2,23 +2,24 @@ import torch
 import torch.backends.cudnn as cudnn
 import torch.utils.data
 import torch.nn.functional as F
+import torch.nn as nn
 
 
 class EPLoss(nn.Module):
     def __init__(self):
-        super(EPLoss, self).init()
+        super(EPLoss, self).__init__()
 
     def forward(self, pred, R, I, target):
         # pred: batch_size, num_steps, num_classes
         # target: batch_size, max_length+1
         # R: batch_size, num_steps, 3  (C, I, D)
         # I: batch_size, num_steps, num_classes
-        batch_size = target.size[0]
-        num_classes = pred.size[2]
-        n_y = pred.size[1]  # todo
-        n_T = target.size[1]  # todo  target中存的是每个position中的index， index在[0, num_classes-1]中
+        batch_size = target.size()[0]
+        num_classes = pred.size()[2]
+        n_y = pred.size()[1]  # todo
+        n_T = target.size()[1]  # todo  target中存的是每个position中的index， index在[0, num_classes-1]中
         p_I = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 1]
-        p_D = torch.zeros(batch_size, n_T, n_y)      # compute from R[:, :, 2]
+        p_D = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 2]
         p_C = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 0]
         EOS = torch.tensor(1, dtype=torch.float)  # float32
 
@@ -35,11 +36,10 @@ class EPLoss(nn.Module):
                 I_T, _ = torch.max(I[:, j, :] * target_onehot, dim=1)  # batch_size
 
                 p_C[:, i, j] = R_C * pd_T  # batch_size, n_T, n_y
-                if j == n_y-1:
+                if j == n_y - 1:
                     p_I[:, i, j] = I_T  # batch_size, n_T, n_y
                 else:
                     p_I[:, i, j] = R_I * I_T  # batch_size, n_T, n_y
-
 
         prev_row = torch.zeros(batch_size, n_y)
         prev_row[:, 0] = 1
@@ -49,8 +49,10 @@ class EPLoss(nn.Module):
         for i in range(1, n_T):
             prev_col = prev_row[:, 0] * p_I[:, i - 1, 0]  # (b)*(b) -> (b)
             for j in range(1, n_y):
-                curr_col = prev_row[:, j - 1] * p_C[:, i - 1, j - 1] + prev_row[:, j] * p_I[:, i - 1, j] + prev_col * p_D[:,
-                    i, j - 1]  # right shift prev_col
+                curr_col = prev_row[:, j - 1] * p_C[:, i - 1, j - 1] + prev_row[:, j] * p_I[:, i - 1,
+                                                                                        j] + prev_col * p_D[:,
+                                                                                                        i,
+                                                                                                        j - 1]  # right shift prev_col
                 prev_row[:, j - 1] = prev_col  # no longer need i-1, j-1, so update prev_row[j-1] to i, j-1
                 prev_col = curr_col  # update prev col (i, j-1) -> (i, j)
             prev_row[:, n_y - 1] = prev_col

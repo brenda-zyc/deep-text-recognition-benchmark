@@ -63,7 +63,7 @@ class Attention(nn.Module):
                 R[:, i, :] = r  # b, num_steps, 3
                 I[:, i, :] = pd_chars  # b, num_steps, num_classes
         # todo: return R, I
-        print("Prediction: {}".format(probs.size()))
+        # print("Prediction: {}".format(probs.size()))
         return probs, R, I  # batch_size x num_steps x num_classes [pd for y]
 
 

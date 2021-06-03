@@ -117,8 +117,8 @@ def validation(model, criterion, evaluation_loader, converter, opt):
                 _, preds_index = preds.max(2)
             preds_str = converter.decode(preds_index.data, preds_size.data)
         
-        else:
-            preds = model(image, text_for_pred, is_train=False)  # get pd
+        elif 'Attn' in opt.Prediction:
+            preds = model(image, text_for_pred, is_train=False)[0]  # get pd
             forward_time = time.time() - start_time
 
             preds = preds[:, :text_for_loss.shape[1] - 1, :]
@@ -129,6 +129,19 @@ def validation(model, criterion, evaluation_loader, converter, opt):
             _, preds_index = preds.max(2)  # greedy search, 找到每个step probability最大的class
             preds_str = converter.decode(preds_index, length_for_pred)
             labels = converter.decode(text_for_loss[:, 1:], length_for_loss)
+
+        else:  # EP loss
+            preds, R, I = model(image, text_for_pred, is_train=False)  # get pd
+            forward_time = time.time() - start_time
+
+            preds = preds[:, :text_for_loss.shape[1] - 1, :]
+            target = text_for_loss[:, 1:]  # without [GO] Symbol
+            cost = criterion(preds, R, I, target)
+
+            # todo: need to modify the decoder part
+            # _, preds_index = preds.max(2)  # greedy search, 找到每个step probability最大的class
+            # preds_str = converter.decode(preds_index, length_for_pred)
+            # labels = converter.decode(text_for_loss[:, 1:], length_for_loss)
 
         infer_time += forward_time
         valid_loss_avg.add(cost)
