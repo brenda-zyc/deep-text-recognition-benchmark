@@ -3,6 +3,8 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data
 import torch.nn.functional as F
 import torch.nn as nn
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 
 
 class EPLoss(nn.Module):
@@ -18,10 +20,10 @@ class EPLoss(nn.Module):
         num_classes = pred.size()[2]
         n_y = pred.size()[1]  # todo
         n_T = target.size()[1]  # todo  target中存的是每个position中的index， index在[0, num_classes-1]中
-        p_I = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 1]
-        p_D = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 2]
-        p_C = torch.zeros(batch_size, n_T, n_y)  # compute from R[:, :, 0]
-        EOS = torch.tensor(1, dtype=torch.float)  # float32
+        p_I = torch.zeros(batch_size, n_T, n_y).to(device)  # compute from R[:, :, 1]
+        p_D = torch.zeros(batch_size, n_T, n_y).to(device)  # compute from R[:, :, 2]
+        p_C = torch.zeros(batch_size, n_T, n_y).to(device)  # compute from R[:, :, 0]
+        EOS = torch.tensor(1, dtype=torch.float).to(device)  # float32
 
         # compute p_C, p_I, p_D
         for j in range(n_y):
