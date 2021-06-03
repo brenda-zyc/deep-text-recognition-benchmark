@@ -30,7 +30,7 @@ def demo(opt):
 
     # load model
     print('loading pretrained model from %s' % opt.saved_model)
-    model.load_state_dict(torch.load(opt.saved_model, map_location=device), strict=False)  # todo: strict=True
+    model.load_state_dict(torch.load(opt.saved_model, map_location=device), strict=True)  # todo: strict=True
 
     # prepare data. two demo images from https://github.com/bgshih/crnn#run-demo
     AlignCollate_demo = AlignCollate(imgH=opt.imgH, imgW=opt.imgW, keep_ratio_with_pad=opt.PAD)
@@ -60,13 +60,19 @@ def demo(opt):
                 # preds_index = preds_index.view(-1)
                 preds_str = converter.decode(preds_index, preds_size)
 
-            else:
+            elif 'Attn' in opt.Prediction:
                 preds = model(image, text_for_pred, is_train=False)
 
                 # select max probabilty (greedy decoding) then decode index to character
-                _, preds_index = preds.max(2)
+                _, preds_index = preds[0].max(2)
                 preds_str = converter.decode(preds_index, length_for_pred)
 
+            else:
+                preds = model(image, text_for_pred, is_train=False)
+
+                # todo: change the function to get preds_index
+                _, preds_index = preds[0].max(2)
+                preds_str = converter.decode(preds_index, length_for_pred)
 
             log = open(f'./log_demo_result.txt', 'a')
             dashed_line = '-' * 80
@@ -75,7 +81,7 @@ def demo(opt):
             print(f'{dashed_line}\n{head}\n{dashed_line}')
             log.write(f'{dashed_line}\n{head}\n{dashed_line}\n')
 
-            preds_prob = F.softmax(preds, dim=2)
+            preds_prob = F.softmax(preds[0], dim=2)
             preds_max_prob, _ = preds_prob.max(dim=2)
             for img_name, pred, pred_max_prob in zip(image_path_list, preds_str, preds_max_prob):
                 if 'Attn' in opt.Prediction:

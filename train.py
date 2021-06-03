@@ -4,6 +4,7 @@ import time
 import random
 import string
 import argparse
+from tqdm import tqdm
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -153,6 +154,7 @@ def train(opt):
     iteration = start_iter
 
     # plot training loss
+    pbar = tqdm(total=3e+5 + 1)
 
     while(True):
         # train part
@@ -187,7 +189,7 @@ def train(opt):
         optimizer.step()
 
         loss_avg.add(cost)
-
+        pbar.update(1)
         # validation part
         if (iteration + 1) % opt.valInterval == 0 or iteration == 0:  # To see training progress, we also conduct validation when 'iteration == 0'
             elapsed_time = time.time() - start_time
@@ -215,7 +217,7 @@ def train(opt):
                 best_model_log = f'{"Best_accuracy":17s}: {best_accuracy:0.3f}, {"Best_norm_ED":17s}: {best_norm_ED:0.2f}'
 
                 loss_model_log = f'{loss_log}\n{current_model_log}\n{best_model_log}'
-                print(loss_model_log)
+                # print(loss_model_log)
                 log.write(loss_model_log + '\n')
 
                 # show some predicted results
@@ -229,11 +231,11 @@ def train(opt):
 
                     predicted_result_log += f'{gt:25s} | {pred:25s} | {confidence:0.4f}\t{str(pred == gt)}\n'
                 predicted_result_log += f'{dashed_line}'
-                print(predicted_result_log)
+                # print(predicted_result_log)
                 log.write(predicted_result_log + '\n')
 
         # save model per 1e+5 iter.
-        if (iteration + 1) % 1e+5 == 0:
+        if (iteration + 1) % 3e+4 == 0:
             torch.save(
                 model.state_dict(), f'./saved_models/{opt.exp_name}/iter_{iteration+1}.pth')
 
