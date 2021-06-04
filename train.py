@@ -13,6 +13,7 @@ import torch.optim as optim
 import torch.utils.data
 import numpy as np
 from torch.utils.tensorboard import SummaryWriter
+from torchsummary import summary
 
 from utils import CTCLabelConverter, CTCLabelConverterForBaiduWarpctc, AttnLabelConverter, Averager
 from dataset import hierarchical_dataset, AlignCollate, Batch_Balanced_Dataset
@@ -20,9 +21,10 @@ from model import Model
 from test import validation
 from ep_loss import EPLoss
 
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 writer = SummaryWriter("runs/eploss")
+
+
 # todo: write to tensor board: training loss, prediction accuracy
 
 def train(opt):
@@ -83,7 +85,8 @@ def train(opt):
 
     # data parallel for multi-GPU
     model = torch.nn.DataParallel(model).to(device)
-
+    num_channels = 3 if opt.rgb else 1
+    summary(model, input_size=(num_channels, opt.imgH, opt.imgW))
     model.train()
     if opt.saved_model != '':
         print(f'loading pretrained model from {opt.saved_model}')
@@ -156,7 +159,7 @@ def train(opt):
     # plot training loss
     pbar = tqdm(total=3e+5 + 1)
 
-    while(True):
+    while (True):
         # train part
         image_tensors, labels = train_dataset.get_batch()
         image = image_tensors.to(device)
@@ -170,11 +173,13 @@ def train(opt):
                 preds = preds.permute(1, 0, 2)  # to use CTCLoss format
                 cost = criterion(preds, text, preds_size, length) / batch_size
             else:
-                preds = preds.log_softmax(2).permute(1, 0, 2)  # compute softmax for classes  num_steps, batch_size, num_classes
-                cost = criterion(preds, text, preds_size, length)  # y, tgt, number of chars being predicted, length of target
+                preds = preds.log_softmax(2).permute(1, 0,
+                                                     2)  # compute softmax for classes  num_steps, batch_size, num_classes
+                cost = criterion(preds, text, preds_size,
+                                 length)  # y, tgt, number of chars being predicted, length of target
 
         elif 'Attn' in opt.Prediction:  # for CE loss
-            preds, _, _ = model(image, text[:, :-1])  # align with Attention.forward
+            preds = model(image, text[:, :-1])  # align with Attention.forward
             target = text[:, 1:]  # without [GO] Symbol  batch_size, max_length+1 (for EOS)
             cost = criterion(preds.view(-1, preds.shape[-1]), target.contiguous().view(-1))
         else:
@@ -191,7 +196,7 @@ def train(opt):
         loss_avg.add(cost)
         pbar.update(1)
         # validation part
-        if (iteration + 1) % opt.valInterval == 0 or iteration == 0:  # To see training progress, we also conduct validation when 'iteration == 0'
+        if (iteration + 1) % opt.valInterval == 0 or iteration == 0:
             elapsed_time = time.time() - start_time
             # for log
             with open(f'./saved_models/{opt.exp_name}/log_train.txt', 'a') as log:
@@ -202,7 +207,7 @@ def train(opt):
                 model.train()
 
                 # training loss and validation loss
-                loss_log = f'[{iteration+1}/{opt.num_iter}] Train loss: {loss_avg.val():0.5f}, Valid loss: {valid_loss:0.5f}, Elapsed_time: {elapsed_time:0.5f}'
+                loss_log = f'[{iteration + 1}/{opt.num_iter}] Train loss: {loss_avg.val():0.5f}, Valid loss: {valid_loss:0.5f}, Elapsed_time: {elapsed_time:0.5f}'
                 loss_avg.reset()
 
                 current_model_log = f'{"Current_accuracy":17s}: {current_accuracy:0.3f}, {"Current_norm_ED":17s}: {current_norm_ED:0.2f}'
@@ -237,7 +242,7 @@ def train(opt):
         # save model per 1e+5 iter.
         if (iteration + 1) % 3e+4 == 0:
             torch.save(
-                model.state_dict(), f'./saved_models/{opt.exp_name}/iter_{iteration+1}.pth')
+                model.state_dict(), f'./saved_models/{opt.exp_name}/iter_{iteration + 1}.pth')
 
         if (iteration + 1) == opt.num_iter:
             print('end the training')
@@ -251,9 +256,9 @@ if __name__ == '__main__':
     parser.add_argument('--train_data', required=True, help='path to training dataset')
     parser.add_argument('--valid_data', required=True, help='path to validation dataset')
     parser.add_argument('--manualSeed', type=int, default=1111, help='for random seed setting')
-    parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)
+    parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)  # workers=0
     parser.add_argument('--batch_size', type=int, default=192, help='input batch size')
-    parser.add_argument('--num_iter', type=int, default=300000, help='number of iterations to train for')
+    parser.add_argument('--num_iter', type=int, default=300000, help='number of iterations to train for')  # num_itr = 1
     parser.add_argument('--valInterval', type=int, default=2000, help='Interval between each validation')
     parser.add_argument('--saved_model', default='', help="path to model to continue training")
     parser.add_argument('--FT', action='store_true', help='whether to do fine-tuning')

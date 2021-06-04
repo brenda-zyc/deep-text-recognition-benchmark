@@ -152,7 +152,7 @@ class Averager(object):
     def __init__(self):
         self.reset()
 
-    def add(self, v):
+    def add(self, v):  # todo: v 是一个torch tensor吗？
         count = v.data.numel()
         v = v.data.sum()
         self.n_count += count

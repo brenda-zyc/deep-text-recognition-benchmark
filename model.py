@@ -65,7 +65,7 @@ class Model(nn.Module):
         elif opt.Prediction == 'Attn':
             self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class)  # input size, hidden size, num classes
         elif opt.Prediction == "EP":
-            self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class)  # do we need to change the input
+            self.Prediction = Attention(self.SequenceModeling_output, opt.hidden_size, opt.num_class, eploss=True)  # do we need to change the input
         else:
             raise Exception('Prediction is neither CTC or Attn or EP')
 
@@ -92,5 +92,5 @@ class Model(nn.Module):
         #     prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)
         else:  # Attn & EP
             prediction = self.Prediction(contextual_feature.contiguous(), text, is_train, batch_max_length=self.opt.batch_max_length)  # should be a tuple in this case
-            # todo: output prediction, R and I
+            # return pd for Attn, (pd, R, I) for EP
         return prediction  # pd
