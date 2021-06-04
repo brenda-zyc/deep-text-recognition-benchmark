@@ -43,7 +43,7 @@ class EPLoss(nn.Module):
                 else:
                     p_I[:, i, j] = R_I * I_T  # batch_size, n_T, n_y
 
-        prev_row = torch.zeros(batch_size, n_y)
+        prev_row = torch.zeros(batch_size, n_y).to(device)
         prev_row[:, 0] = 1
         # todo: check the correctness of batch implementation, combine for loop above with for loop below
         for j in range(1, n_y):  # i=0, i.e. target has 0 tokens
@@ -60,4 +60,4 @@ class EPLoss(nn.Module):
             prev_row[:, n_y - 1] = prev_col
         loss = torch.log(prev_row[:, n_y - 1])  # n_T-1, n_y-1 (loss for y, T)
 
-        return loss  # batch_size
+        return loss.mean()  # batch_size

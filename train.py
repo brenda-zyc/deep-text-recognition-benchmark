@@ -23,6 +23,7 @@ from ep_loss import EPLoss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 writer = SummaryWriter("runs/eploss")
+torch.autograd.set_detect_anomaly(True)
 
 
 # todo: write to tensor board: training loss, prediction accuracy
