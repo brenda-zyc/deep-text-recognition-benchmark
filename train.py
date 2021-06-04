@@ -85,8 +85,8 @@ def train(opt):
 
     # data parallel for multi-GPU
     model = torch.nn.DataParallel(model).to(device)
-    num_channels = 3 if opt.rgb else 1
-    summary(model, input_size=(num_channels, opt.imgH, opt.imgW))
+    # num_channels = 3 if opt.rgb else 1
+    # summary(model, input_size=(num_channels, opt.imgH, opt.imgW))
     model.train()
     if opt.saved_model != '':
         print(f'loading pretrained model from {opt.saved_model}')
