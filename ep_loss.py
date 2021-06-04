@@ -3,8 +3,8 @@ import torch.backends.cudnn as cudnn
 import torch.utils.data
 import torch.nn.functional as F
 import torch.nn as nn
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class EPLoss(nn.Module):
@@ -13,24 +13,24 @@ class EPLoss(nn.Module):
 
     def forward(self, pred, R, I, target):
         # pred: batch_size, num_steps, num_classes
-        # target: batch_size, max_length+1
+        # target: batch_size, max_length+1=num_steps
         # R: batch_size, num_steps, 3  (C, I, D)
         # I: batch_size, num_steps, num_classes
-        batch_size = target.size()[0]
-        num_classes = pred.size()[2]
-        n_y = pred.size()[1]  # todo
-        n_T = target.size()[1]  # todo  target中存的是每个position中的index， index在[0, num_classes-1]中
+
+        batch_size, n_y, num_classes = pred.size()  # num_steps (26?)
+        n_T = target.size()[1]  # target中存的是每个position中的index， index在[0, num_classes-1]中  # max_length+1
+
         p_I = torch.zeros(batch_size, n_T, n_y).to(device)  # compute from R[:, :, 1]
         p_D = torch.zeros(batch_size, n_T, n_y).to(device)  # compute from R[:, :, 2]
         p_C = torch.zeros(batch_size, n_T, n_y).to(device)  # compute from R[:, :, 0]
-        EOS = torch.tensor(1, dtype=torch.float).to(device)  # float32
+        EOS = torch.tensor(1, dtype=torch.long).to(device)  # long (b/c 'eos' <-> 1)
 
         # compute p_C, p_I, p_D
         for j in range(n_y):
             R_C = R[:, j, 0]
             R_I = R[:, j, 1]
-            R_D = R[:, j, 2].unsqueeze(1).repeat(1, num_classes)
-            p_D[:, :, j] = torch.where(target.float() == EOS, EOS, R_D)  # num_batch, num_steps
+            R_D = R[:, j, 2].unsqueeze(1).repeat(1, n_y)  # 192, 26
+            p_D[:, :, j] = torch.where(target == EOS, EOS.float(), R_D)  # num_batch, num_steps(n_T), num_steps(n_y)
 
             for i in range(n_T):
                 target_onehot = F.one_hot(target[:, i], num_classes=num_classes)  # batch_size, num_classes
