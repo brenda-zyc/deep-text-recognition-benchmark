@@ -46,7 +46,6 @@ class Attention(nn.Module):
                 # one-hot vectors for a i-th char. in a batch
                 char_onehots = self._char_to_onehot(text[:, i], onehot_dim=self.num_classes)
                 # hidden : decoder's hidden s_{t-1}, batch_H : encoder's hidden H, char_onehots : one-hot(y_{t-1})
-                hidden, alpha, r, pd_chars = self.attention_cell(hidden, batch_H, char_onehots)
                 if self.eploss:
                     hidden, alpha, r, pd_chars = self.attention_cell(hidden, batch_H, char_onehots)
                     R[:, i, :] = r  # b, num_steps, 3
@@ -76,7 +75,7 @@ class Attention(nn.Module):
                 targets = next_input  # y_{t}
         # todo: return R, I
         # print("Prediction: {}".format(probs.size()))
-        if eploss:
+        if self.eploss:
             return probs, R, I
         else:
             return probs # batch_size x num_steps x num_classes [pd for y]
